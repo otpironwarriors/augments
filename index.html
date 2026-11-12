@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Когитатор аугметики</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+@font-face { font-family: "T16"; src: url(fonts/ter-16n.woff2) format("woff2"); }
+@font-face { font-family: "T16B"; src: url(fonts/ter-16b.woff2) format("woff2"); }
+@font-face { font-family: "T20"; src: url(fonts/ter-20n.woff2) format("woff2"); }
+@font-face { font-family: "T20B"; src: url(fonts/ter-20b.woff2) format("woff2"); }
+@font-face { font-family: "T24"; src: url(fonts/ter-24n.woff2) format("woff2"); }
+@font-face { font-family: "T24B"; src: url(fonts/ter-24b.woff2) format("woff2"); }
+@font-face { font-family: "T28"; src: url(fonts/ter-28n.woff2) format("woff2"); }
+@font-face { font-family: "T28B"; src: url(fonts/ter-28b.woff2) format("woff2"); }
+@font-face { font-family: "T32"; src: url(fonts/ter-32n.woff2) format("woff2"); }
+@font-face { font-family: "T32B"; src: url(fonts/ter-32b.woff2) format("woff2"); }
+
+/* Терминал в текстовом режиме: весь экран — одна сетка знакомест.
+   Размер знакоместа подбирается под экран: Terminus 16, 20, 24, 28 или 32 (8×16 … 16×32).
+   Рамки, меню, схема легионера, панель имплантов, консоль и строка клавиш рисуются символами.
+   Два размера шрифта: 16 для всего, 32 для заголовка. Четыре яркости люминофора. */
+:root {
+  color-scheme: dark;
+  --bg: #020a04;
+  --glass: #0e2a17;
+  --dim: #0f4a1e;
+  --mid: #2a9a44;
+  --fg: #48f06a;
+  --hi: #c4ffd0;
+  --glow: rgba(72, 240, 106, .45);
+  --ch: 16px;
+  --cw: 8px;
+  --fam: "T16", monospace;
+  --famb: "T16B", monospace;
+  --scan: .3;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--bg); }
+body {
+  margin: 0;
+  color: var(--fg);
+  font: 400 var(--ch)/var(--ch) var(--fam);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-synthesis: none;
+  text-rendering: optimizeSpeed;
+  background: radial-gradient(120% 90% at 50% 40%, var(--glass), var(--bg) 75%) fixed, var(--bg);
+}
+body::after { /* сканлайны, цветная маска и виньетка поверх всего окна */
+  content: "";
+  position: fixed; inset: 0;
+  background:
+    repeating-linear-gradient(180deg, rgba(0,0,0,var(--scan)) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255,40,40,.045) 0 1px, rgba(40,255,90,.02) 1px 2px, rgba(60,90,255,.05) 2px 3px),
+    radial-gradient(140% 120% at 50% 50%, transparent 60%, rgba(0,0,0,.55) 100%);
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* ---------- экран ---------- */
+/* терминал не выделяется мышью: выделение перебивало клики и рисовало синие полосы поверх экрана */
+.term, #boot { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+::selection { background: var(--fg); color: var(--bg); }
+.term { margin: 0 auto; padding: 24px var(--pad, 32px) 16px; transform-origin: 50% 40vh; }
+.head { height: calc(var(--ch) * 5); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ch); }
+.head > div:first-child { min-width: 0; }
+.head .sv { height: var(--ch); white-space: pre; overflow: hidden; }
+.head .m, .m { color: var(--mid); }
+/* заголовок — тот же Terminus, увеличенный ровно в 2 раза */
+.title { font: calc(var(--ch) * 2)/calc(var(--ch) * 2) var(--famb); height: calc(var(--ch) * 2); margin: calc(var(--ch) / 2) 0; white-space: nowrap; overflow: hidden; text-shadow: 0 0 10px var(--glow), 0 0 2px var(--glow); }
+.legion { display: flex; gap: var(--ch); align-items: flex-start; flex: none; }
+.legion .cap { text-align: right; white-space: pre; }
+#emblem { display: block; filter: drop-shadow(0 0 4px var(--glow)); }
+.scrw { position: relative; margin-top: var(--ch); }
+#scr { font-variant-emoji: text; margin: 0; font: var(--ch)/var(--ch) var(--fam); white-space: pre; color: var(--fg); }
+#cmd { position: absolute; height: var(--ch); padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; font: var(--ch)/var(--ch) var(--fam); opacity: 0; }
+
+/* роли яркости */
+#scr .d { color: var(--dim); }
+#scr .m { color: var(--mid); }
+#scr .h { color: var(--hi); text-shadow: 0 0 6px var(--glow); }
+#scr .i { background: var(--fg); color: var(--bg); box-shadow: 0 0 10px var(--glow); }
+#scr .cur { color: var(--hi); animation: blink 1s steps(1) infinite; }
+/* пиксели фигуры: верхняя и нижняя половины знакоместа */
+#scr .c1 { color: var(--dim); } #scr .c2 { color: var(--mid); } #scr .c3 { color: var(--fg); } #scr .c4 { color: var(--hi); text-shadow: 0 0 6px var(--glow); }
+#scr .c1b2 { color: var(--dim); background: var(--mid); }
+#scr .c1b3 { color: var(--dim); background: var(--fg); }
+#scr .c1b4 { color: var(--dim); background: var(--hi); }
+#scr .c2b1 { color: var(--mid); background: var(--dim); }
+#scr .c2b3 { color: var(--mid); background: var(--fg); }
+#scr .c2b4 { color: var(--mid); background: var(--hi); }
+#scr .c3b1 { color: var(--fg); background: var(--dim); }
+#scr .c3b2 { color: var(--fg); background: var(--mid); }
+#scr .c3b4 { color: var(--fg); background: var(--hi); }
+#scr .c4b1 { color: var(--hi); background: var(--dim); }
+#scr .c4b2 { color: var(--hi); background: var(--mid); }
+#scr .c4b3 { color: var(--hi); background: var(--fg); }
+@keyframes blink { 0%, 49% { opacity: 1; } 58% { opacity: .35; } 70%, 100% { opacity: 0; } }
+
+/* ---------- кинескоп ---------- */
+#glass { position: fixed; inset: 0; pointer-events: none; z-index: 52; border-radius: 34px / 28px;
+  box-shadow: 0 0 0 100vmax #000, inset 0 0 90px 24px rgba(0,0,0,.55), inset 0 0 14px 4px rgba(0,0,0,.7); }
+#glare { position: fixed; inset: 0; pointer-events: none; z-index: 52;
+  background: radial-gradient(38% 30% at 18% 12%, rgba(220,255,230,.045), transparent 70%),
+              linear-gradient(115deg, transparent 0 30%, rgba(220,255,230,.018) 34%, transparent 42%); }
+#flick { position: fixed; inset: 0; pointer-events: none; z-index: 53; background: #000; opacity: 0; }
+#roll { position: fixed; left: 0; right: 0; top: 0; height: 22vh; pointer-events: none; z-index: 51;
+  background: linear-gradient(180deg, transparent, rgba(200,255,210,.035) 45%, rgba(200,255,210,.05) 55%, transparent);
+  animation: roll 16s linear infinite; will-change: transform; }
+@keyframes roll { 0% { transform: translateY(110vh); } 45% { transform: translateY(-30vh); } 100% { transform: translateY(-30vh); } }
+#gband { position: fixed; left: 0; right: 0; height: 4px; pointer-events: none; z-index: 54; background: var(--hi); opacity: .3; mix-blend-mode: screen; }
+#power { position: fixed; inset: 0; z-index: 70; background: #000; display: grid; place-items: center; }
+#power i { display: block; width: 2px; height: 2px; background: #cfeed7; box-shadow: 0 0 8px 2px var(--glow); }
+#boot { position: fixed; inset: 0; z-index: 60; background: radial-gradient(120% 90% at 50% 40%, var(--glass), var(--bg) 75%), var(--bg);
+  padding: calc(var(--ch) * 3) var(--pad, 32px); white-space: pre; font: var(--ch)/var(--ch) var(--fam); color: var(--fg); transition: opacity .35s; }
+#boot .m { color: var(--mid); } #boot .h { color: var(--hi); }
+#boot .cur { color: var(--hi); animation: blink 1s steps(1) infinite; }
+#boot.out { opacity: 0; pointer-events: none; }
+/* курсор-прицел */
+@media (pointer: fine) { html.cc, html.cc * { cursor: none !important; } }
+#cur, .trl { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 80; }
+#cur { width: 17px; height: 17px; margin: -8px 0 0 -8px;
+  background: linear-gradient(var(--hi), var(--hi)) 8px 0 / 1px 6px no-repeat, linear-gradient(var(--hi), var(--hi)) 8px 11px / 1px 6px no-repeat,
+              linear-gradient(var(--hi), var(--hi)) 0 8px / 6px 1px no-repeat, linear-gradient(var(--hi), var(--hi)) 11px 8px / 6px 1px no-repeat,
+              linear-gradient(var(--hi), var(--hi)) 7px 7px / 3px 3px no-repeat;
+  filter: drop-shadow(0 0 3px var(--fg)); }
+#cur.on { width: var(--cw); height: var(--ch); margin: calc(var(--ch) / -2) 0 0 -2px; background: var(--fg); opacity: .85; }
+#cur.txt { width: 2px; height: var(--ch); margin: calc(var(--ch) / -2) 0 0 -1px; background: var(--hi); }
+.trl { width: 3px; height: 3px; margin: -1px 0 0 -1px; background: var(--fg); }
+
+@media (max-width: 700px) {
+  .legion .cap { display: none; }
+  .term { padding-top: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { #scr .cur, #boot .cur, #roll { animation: none; } #roll { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="term" id="term">
+  <header class="head">
+    <div>
+      <div class="sv m" id="lit"></div>
+      <div class="title" id="title">ОБЩИЙ ВИД</div>
+      <div class="sv m" id="sub"></div>
+    </div>
+    <div class="legion">
+      <div class="cap" id="cap"></div>
+      <svg id="emblem" viewBox="0 0 25 31" width="100" height="124" shape-rendering="crispEdges" role="img" aria-label="Символ легиона"></svg>
+    </div>
+  </header>
+  <div class="scrw" id="scrw">
+    <pre id="scr" aria-live="off"></pre>
+    <input id="cmd" autocomplete="off" spellcheck="false" aria-label="Командная строка">
+  </div>
+</div>
+<div id="boot" hidden></div>
+<div id="roll" aria-hidden="true"></div>
+<div id="glare" aria-hidden="true"></div>
+<div id="glass" aria-hidden="true"></div>
+<div id="flick" aria-hidden="true"></div>
+<div id="gband" aria-hidden="true" hidden></div>
+<div id="power" aria-hidden="true" hidden><i></i></div>
+<div id="cur" aria-hidden="true" hidden></div>
+
+<script src="implants.js"></script>
+<script>
+const EMB = [
+  "............X............",
+  "........XXX.X.XXX........",
+  "...XXXXXXXX.X.XXXXXXXX...",
+  "...XXXXXXXX.X.XXXXXXXX...",
+  "..XXX.XXXXX.X.XXXXX.XXX..",
+  "....XXXXXXX.X.XXXXXXX....",
+  "..X.XXXXXXX.X.XXXXXXX.X..",
+  "..X.XXXXXXX.X.XXXXXXX.X..",
+  "..X.X.XXXXX.X.XXXXX.X.X..",
+  "..X.XXXXXXX.X.XXXXXXX.X..",
+  "..X.XXXXXXX.X.XXXXXXX.X..",
+  "..X.XXXXXXX.X.XXXXXXX.X..",
+  "....X.XXXXX.X.XXXXX.X....",
+  "..XXXXXXXXX...XXXXXXXXX..",
+  "XX........XXXXX........XX",
+  "XX.........XXX.........XX",
+  "XXX........X.X........XXX",
+  "XXXXXXXXXXX...XXXXXXXXXXX",
+  ".XXXXXXXXXX.X.XXXXXXXXXX.",
+  "..XX.XXXXXXXXXXXXXXX.XX..",
+  "...X.X.XX.XX.XX.XX.X.X...",
+  ".....X.XX.XX.XX.XX.X.....",
+  ".....X.XX.XX.XX.XX.X.....",
+  ".....X.XX.XX.XX.XX.X.....",
+  ".....X.XX.XX.XX.XX.X.....",
+  ".....X.XX.XX.XX.XX.X.....",
+  ".....X.XX.XX.XX.XX.X.....",
+  "......XXX.XX.XX.XXX......",
+  ".......XX.XX.XX.XX.......",
+  ".........XXXXXXX.........",
+  "...........XXX...........",
+];
+
+// спрайт легионера 24×40 (Мк IV). lv: яркость 0–4, part: h голова · t торс · a руки · l ноги, bone: b кость · k провал · g сердце, bpart: часть тела кости
+const SPRITE = {"lv": ["........................", "........................", ".........333333.........", ".....33.31111113.33.....", ".....33.30011003.33.....", ".....33.34400443.33.....", ".....33.30011003.33.....", "....3013211111113103....", ".3332200021111100022333.", "311111220002100022111113", "314111110000000021111413", "311111110111111021111113", "311111112011110211111113", "311111110111111021111113", "311111110111111021111113", "300330030111111030033003", ".3330300111111110033003.", ".3003.311111111113.3003.", ".3113.311111111113.3113.", ".3113..3000000003..3113.", ".3003..3104444013..3003.", "32223.321100001113.32223", "31113.300000000003.31113", "31113.311021110113.31113", "31113.311021110113.31113", "31013.311103302113.31013", "30203.32103..30213.30203", "32123.30013..31003.32123", "31113.30003..30003.31113", "33333.32223..32223.33333", "......31113..31113......", ".....31111133111113.....", "......31113..31113......", "......30003..30003......", "......31113..31113......", "......30003..30003......", ".....322223..322223.....", ".....311113..311113.....", ".....311113..311113.....", ".....333333..333333....."], "part": ["........................", "........................", ".........hhhhhh.........", ".....tt.hhhhhhhh.tt.....", ".....tt.hhhhhhhh.tt.....", ".....tt.hhhhhhhh.tt.....", ".....tt.hhhhhhhh.tt.....", "....tttthhhhhhhhtttt....", ".aaaaatthhhhhhhhttaaaaa.", "aaaaaaaahhhhhhhhaaaaaaaa", "aaaaaaaattttttttaaaaaaaa", "aaaaaaaattttttttaaaaaaaa", "aaaaaaaaattttttaaaaaaaaa", "aaaaaaaattttttttaaaaaaaa", "aaaaaaaattttttttaaaaaaaa", "aaaaaaaattttttttaaaaaaaa", ".aaaaattttttttttttaaaaa.", ".aaaa.tttttttttttt.aaaa.", ".aaaa.tttttttttttt.aaaa.", ".aaaa..tttttttttt..aaaa.", ".aaaa..tttttttttt..aaaa.", "aaaaa.tttttttttttt.aaaaa", "aaaaa.tttttttttttt.aaaaa", "aaaaa.tttttttttttt.aaaaa", "aaaaa.tttttttttttt.aaaaa", "aaaaa.ttttlttltttt.aaaaa", "aaaaa.lttll..llttl.aaaaa", "aaaaa.lllll..lllll.aaaaa", "aaaaa.lllll..lllll.aaaaa", "aaaaa.lllll..lllll.aaaaa", "......lllll..lllll......", ".....llllllllllllll.....", "......lllll..lllll......", "......lllll..lllll......", "......lllll..lllll......", "......lllll..lllll......", ".....llllll..llllll.....", ".....llllll..llllll.....", ".....llllll..llllll.....", ".....llllll..llllll....."], "bone": ["........................", "........................", "...........bb...........", ".........bbbbbb.........", ".........bbbbbb.........", ".........kkbbkk.........", ".........bbbbbb.........", "..........bbbb..........", "........................", "......bbbbbbbbbbbb......", "...........bb...........", "..bb....bbbbbbbb....bb..", "..bb.......bb.......bb..", "..bb...bbbbbbbbbb...bb..", "..bb.....g.bb.g.....bb..", "..bb....bbbbbbbb....bb..", "..bb.......bb.......bb..", "..bb....bbbbbbbb....bb..", "..bb.......bb.......bb..", "..bb.......bb.......bb..", "..bb....b..bb..b....bb..", "........bbbbbbbb........", "...b................b...", "...b....b......b....b...", "...b....b......b....b...", "...b....b......b....b...", "...b....b......b....b...", "........b......b........", ".bbb....b......b....bbb.", "........b......b........", "........b......b........", ".......bbb....bbb.......", ".......b.b....b.b.......", ".......b.b....b.b.......", ".......b.b....b.b.......", ".......b.b....b.b.......", ".......b.b....b.b.......", "......bbbb....bbbb......", "........................", "........................"], "bpart": ["........................", "........................", "...........hh...........", ".........hhhhhh.........", ".........hhhhhh.........", ".........hhhhhh.........", ".........hhhhhh.........", "..........hhhh..........", "........................", "......tttttttttttt......", "...........tt...........", "..aa....tttttttt....aa..", "..aa.......tt.......aa..", "..aa...tttttttttt...aa..", "..aa.....t.tt.t.....aa..", "..aa....tttttttt....aa..", "..aa.......tt.......aa..", "..aa....tttttttt....aa..", "..aa.......tt.......aa..", "..aa.......tt.......aa..", "..aa....t..tt..t....aa..", "........tttttttt........", "...a................a...", "...a....l......l....a...", "...a....l......l....a...", "...a....l......l....a...", "...a....l......l....a...", "........l......l........", ".aaa....l......l....aaa.", "........l......l........", "........l......l........", ".......lll....lll.......", ".......l.l....l.l.......", ".......l.l....l.l.......", ".......l.l....l.l.......", ".......l.l....l.l.......", ".......l.l....l.l.......", "......llll....llll......", "........................", "........................"]};
+const FW = 24, FH = 40;
+// области приближения (координаты спрайта)
+const VIEW = { full: [0, 0, 24, 40], head: [4, 0, 16, 14], torso: [3, 6, 18, 20], arms: [0, 6, 24, 26], legs: [4, 22, 16, 18] };
+// точки на теле для выносок
+const ANCHORS = {
+  eyes: [[10, 5.2]], frontal: [[11.5, 3]], mouth: [[11.5, 8]],
+  blood: [[9, 14.5]], skeleton: [[11.5, 16.5]], marrow: [[8, 21]], skin: [[7, 11.5]],
+  arm: [[2.5, 19], [21, 19]], hand: [[2.5, 28.5], [21, 28.5]],
+  leg: [[8.5, 30], [15, 30]], foot: [[7.5, 38.5], [16, 38.5]],
+};
+
+// ===================== состояние =====================
+const $ = (id) => document.getElementById(id);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let current = null;          // выбранная часть тела
+let picked = {};             // имплант, открытый в карточке, по частям
+let hoverAct = "";           // что сейчас под курсором (data-act)
+let scanLv = 2;
+try { scanLv = +(localStorage.getItem("cog-scan") ?? 2); } catch (e) {}
+if (!(scanLv >= 0 && scanLv <= 3)) scanLv = 2;
+let figView = "full", figXray = null;      // что сейчас нарисовано на схеме
+let figFx = null;                          // анимация перерисовки схемы
+let panelScroll = 0, panelReveal = 1e9, panelRows = 0;
+let cardFx = null;
+const consoleLog = [];
+const implantsOf = (s) => s.implants;
+const allSections = () => BODY.flatMap((p) => p.sections);
+const countPart = (p) => p.sections.reduce((n, s) => n + implantsOf(s).length, 0);
+const findImp = (part, id) => { if (!part || !id) return null; for (const s of part.sections) for (const i of implantsOf(s)) if (i.id === id) return [s, i]; return null; };
+const partOf = (id) => BODY.find((p) => p.id === id) || null;
+
+// редкость и тип импланта для карточки
+const RARITY = [["advanced", "ПРОДВИНУТЫЙ"], ["rare", "РЕДКИЙ"], ["prestige", "ПРЕСТИЖНЫЙ"]];
+const rarityName = (k) => (RARITY.find((r) => r[0] === k) || [k, String(k).toUpperCase()])[1];
+const TYPES = { active: "АКТИВНЫЙ", passive: "ПАССИВНЫЙ", auto: "АВТОМАТИЧЕСКИЙ" };
+
+// ===================== растр фигуры =====================
+const PARTS = { h: "head", t: "torso", a: "arms", l: "legs" };
+// границы каждой части тела в пикселях спрайта: [x0, y0, x1, y1] включительно
+const PART_BOX = (() => {
+  const box = {};
+  const add = (k, x, y) => { const b = box[k] || (box[k] = [x, y, x, y]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); };
+  SPRITE.part.forEach((r, y) => [...r].forEach((c, x) => { if (c !== ".") { add(PARTS[c], x, y); add("full", x, y); } }));
+  return box;
+})();
+// яркость пикселя схемы 0..4 и часть тела
+function pix(x, y, xray, hot) {
+  if (x < 0 || y < 0 || x >= FW || y >= FH) return [0, ""];
+  const c = SPRITE.lv[y][x], b = SPRITE.bone[y][x];
+  if (xray && b === "b") { const bp = PARTS[SPRITE.bpart[y][x]]; return [bp === xray ? 4 : 1, bp]; }
+  if (c === ".") return [0, ""];
+  const p = PARTS[SPRITE.part[y][x]], v = +c;
+  if (xray) {
+    if (b === "k") return [0, p];
+    if (b === "g") return [3, p];
+    if (v === 3) return [p === xray || p === hot ? 2 : 1, p];
+    return [0, p];
+  }
+  if (p === hot && v === 1) return [2, p];
+  return [v, p];
+}
+function pixAt(sx, sy, s, xray, hot) {
+  if (s >= 1) return pix(Math.floor(sx), Math.floor(sy), xray, hot);
+  const x0 = Math.floor(sx), y0 = Math.floor(sy);
+  let best = [0, ""], bp = -1;
+  for (const [dx, dy] of [[0,0],[1,0],[0,1],[1,1]]) {
+    const r = pix(x0 + dx, y0 + dy, xray, hot);
+    const pr = r[0] * 10 + (r[1] ? 1 : 0);
+    if (pr > bp) { bp = pr; best = r; }
+  }
+  return best;
+}
+
+// ===================== знакоместа =====================
+class Grid {
+  constructor(w, h) { this.w = w; this.h = h; const n = w * h; this.ch = new Array(n).fill(" "); this.cl = new Array(n).fill(""); this.ac = new Array(n).fill(""); }
+  put(x, y, str, cl = "", ac = "") {
+    if (y < 0 || y >= this.h) return;
+    let i = 0;
+    for (const c of str) { const xx = x + i++; if (xx < 0 || xx >= this.w) continue; const k = y * this.w + xx; this.ch[k] = c; this.cl[k] = cl; this.ac[k] = ac; }
+  }
+  paint(x, y, w, cl, ac) { for (let i = 0; i < w; i++) { const xx = x + i; if (xx < 0 || xx >= this.w || y < 0 || y >= this.h) continue; const k = y * this.w + xx; if (cl !== undefined) this.cl[k] = cl; if (ac !== undefined) this.ac[k] = ac; } }
+  box(x, y, w, h, title, extra, cl = "m", ac = "") {
+    this.put(x, y, "┌" + "─".repeat(w - 2) + "┐", cl, ac);
+    this.put(x, y + h - 1, "└" + "─".repeat(w - 2) + "┘", cl, ac);
+    for (let j = 1; j < h - 1; j++) { this.put(x, y + j, "│", cl, ac); this.put(x + w - 1, y + j, "│", cl, ac); if (ac) this.paint(x + 1, y + j, w - 2, undefined, ac); }
+    if (title) this.put(x + 2, y, "┤ " + title + " ├", "h");
+    if (extra) this.put(x + w - 3 - extra.length, y, "┤" + extra + "├", "m");
+  }
+  sep(x, y, w, title) { this.put(x, y, "├" + "─".repeat(w - 2) + "┤", "m"); if (title) this.put(x + 2, y, "┤ " + title + " ├", "h"); }
+  html() {
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const out = [];
+    for (let y = 0; y < this.h; y++) {
+      let s = "", buf = "", ck = null, ca = null;
+      const flush = () => { if (!buf) return; s += ck || ca ? `<span${ck ? ` class="${ck}"` : ""}${ca ? ` data-act="${ca}"` : ""}>${esc(buf)}</span>` : esc(buf); buf = ""; };
+      for (let x = 0; x < this.w; x++) { const k = y * this.w + x; if (this.cl[k] !== ck || this.ac[k] !== ca) { flush(); ck = this.cl[k]; ca = this.ac[k]; } buf += this.ch[k]; }
+      flush(); out.push(s);
+    }
+    return out.join("\n");
+  }
+}
+const pad = (s, n) => (s.length > n ? s.slice(0, n) : s + " ".repeat(n - s.length));
+function wrap(text, w) {
+  const out = []; let cur = "";
+  for (const word of String(text).split(/\s+/)) {
+    if (!word) continue;
+    if ((cur + " " + word).trim().length > w) { if (cur) out.push(cur); cur = word.length > w ? word.slice(0, w) : word; }
+    else cur = (cur + " " + word).trim();
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+// ===================== раскладка =====================
+let L = null, CH = 16, CW = 8;
+// самый крупный шрифт, при котором влезает полный трёхколоночный экран
+function pickCell() {
+  const W = innerWidth, H = innerHeight;
+  let c = [16, 8];
+  if (W >= 700) for (const [ch, cw] of [[32, 16], [28, 14], [24, 12], [20, 10]]) {
+    const cols = Math.floor((W - 64) / cw), rows = Math.floor((H - 40) / ch) - 6;
+    if (cols >= 118 && rows >= 26) { c = [ch, cw]; break; }
+  }
+  [CH, CW] = c;
+  const r = document.documentElement.style;
+  r.setProperty("--ch", CH + "px"); r.setProperty("--cw", CW + "px");
+  r.setProperty("--fam", `"T${CH}", monospace`); r.setProperty("--famb", `"T${CH}B", monospace`);
+  const px = Math.max(2, Math.floor((5 * CH) / 31)), e = $("emblem");
+  e.setAttribute("width", 25 * px); e.setAttribute("height", 31 * px);
+}
+function layout() {
+  const W = innerWidth, H = innerHeight;
+  const padX = W < 600 ? 16 : 32;
+  const cols = Math.max(36, Math.min(200, Math.floor((W - padX * 2) / CW)));
+  document.documentElement.style.setProperty("--pad", padX + "px");
+  $("term").style.maxWidth = cols * CW + padX * 2 + "px";
+  const rowsAvail = Math.floor((H - 24 - 16 - 6 * CH) / CH);
+  const wide = cols >= 110 && rowsAvail >= 24;
+  const o = { cols, wide, sepY: 0 };
+  if (wide) {
+    const lw = 26, pw = Math.max(42, Math.min(56, Math.floor(cols * .34)));
+    o.rows = rowsAvail;
+    o.left = { x: 0, y: 1, w: lw, h: o.rows - 2 };
+    o.panel = { x: cols - pw, y: 1, w: pw, h: o.rows - 2 };
+    o.fig = { x: lw + 1, y: 1, w: cols - lw - pw - 2, h: o.rows - 2 };
+    o.keysY = o.rows - 1;
+  } else {
+    // узкий экран: вкладки, схема, импланты и кнопки друг под другом
+    const n = cols >= 88 ? 4 : 2;
+    o.tabs = { y: 1, n, h: (BODY.length / n) * 3 };
+    const fh = Math.max(22, Math.min(36, Math.floor(cols * .62) + 3, Math.floor(H / CH) - 12));
+    o.fig = { x: 0, y: o.tabs.y + o.tabs.h, w: cols, h: fh };
+    o.panel = { x: 0, y: o.fig.y + fh, w: cols, h: 0 };
+    o.btnN = n;
+  }
+  return o;
+}
+
+// ===================== схема =====================
+const SCALES = [6, 5, 4, 3, 2, 1];
+function fitScale(view, iw, uh) {
+  const [, , w, h] = VIEW[view];
+  for (const s of SCALES) if (w * s <= iw + 2 && h * s <= uh + 2) return s;
+  return 1;
+}
+function figScales(iw, uh) {
+  // общий вид всегда мельче любого приближения
+  const full = fitScale("full", iw, uh);
+  const parts = Math.min(...["torso", "arms", "legs", "head"].map((v) => fitScale(v, iw, uh)));
+  return full >= parts ? Math.max(1, parts - 1) : full;
+}
+let figMap = null;
+function drawFig(g, R) {
+  const ix = R.x + 1, iy = R.y + 1, iw = R.w - 2, fh = R.h - 3, uh = fh * 2;
+  const fx = figFx;
+  const viewKey = fx && fx.phase === "raster" ? fx.next : figView;
+  const xray = fx && fx.phase === "raster" ? fx.xray : figXray;
+  const s = viewKey === "full" ? figScales(iw, uh) : fitScale(viewKey, iw, uh);
+  const [vx, vy, vw, vh] = VIEW[viewKey];
+  const cx = vx + vw / 2, cy = vy + vh / 2;
+  const hot = hoverAct.startsWith("part:") ? hoverAct.slice(5) : "";
+  const zl = s === .5 ? "×½" : "×" + s;
+  const part = partOf(figXray);
+  g.box(R.x, R.y, R.w, R.h, xray ? `РЕНТГЕН · ${partOf(xray).lat}` : "СХЕМА ЛЕГИОНЕРА", fx && fx.phase === "raster" ? ` СКАН ${Math.round(fx.pct * 100)}% ` : ` МАСШТАБ ${zl} `);
+  figMap = { ix, iy, iw, uh, cx, cy, s, view: viewKey };
+  const hint = xray ? (L.wide ? "БРОНЯ ПРОСВЕЧЕНА · ESC — ОБЩИЙ ВИД" : "БРОНЯ ПРОСВЕЧЕНА") : "НАЖМИТЕ НА ЧАСТЬ ТЕЛА";
+  g.put(ix + Math.max(0, Math.floor((iw - hint.length) / 2)), iy + fh, hint, "m");
+  if (fx && fx.phase === "collapse") { g.put(ix + 2, iy + Math.floor(fh / 2), "─".repeat(Math.max(0, iw - 4)), "c4"); return; }
+  for (let r = 0; r < fh; r++) {
+    if (fx && fx.phase === "raster") {
+      const vis = fx.pass === 0 ? r % 2 === 0 && r <= fx.row : r % 2 === 0 || r <= fx.row;
+      if (!vis) continue;
+      if (r === fx.row) { g.put(ix, iy + r, "▀".repeat(iw), "c4"); continue; }
+    }
+    for (let c = 0; c < iw; c++) {
+      const sx = cx + (c - iw / 2) / s + (s >= 1 ? .5 / s : 0);
+      const syT = cy + (2 * r - uh / 2) / s + (s >= 1 ? .5 / s : 0), syB = cy + (2 * r + 1 - uh / 2) / s + (s >= 1 ? .5 / s : 0);
+      const [t, pt] = pixAt(sx, syT, s, xray, hot), [b, pb] = pixAt(sx, syB, s, xray, hot);
+      if (!t && !b && !pt && !pb) continue;
+      let ch, cl;
+      if (t === b) { ch = t ? "█" : " "; cl = t ? "c" + t : ""; }
+      else if (!b) { ch = "▀"; cl = "c" + t; }
+      else if (!t) { ch = "▄"; cl = "c" + b; }
+      else { ch = "▀"; cl = "c" + t + "b" + b; }
+      const p = pt || pb;
+      const k = (iy + r) * g.w + ix + c;
+      g.ch[k] = ch; g.cl[k] = cl; g.ac[k] = p ? "part:" + p : "";
+    }
+  }
+  // рамка цели перед переключением
+  if (fx && fx.phase === "target" && fx.blink && fx.next !== figView) {
+    // рамка обводит саму часть тела (по пикселям спрайта) с отступом в один пиксель
+    const [bx0, by0, bx1, by1] = PART_BOX[fx.next] || PART_BOX.full;
+    const col = (x) => Math.floor((x - cx) * s + iw / 2), row = (y) => Math.floor(((y - cy) * s + uh / 2) / 2);
+    const c0 = col(bx0) - 1, c1 = col(bx1 + 1), r0 = row(by0) - 1, r1 = row(by1 + 1);
+    const C0 = Math.max(0, c0), C1 = Math.min(iw - 1, c1), R0 = Math.max(0, r0), R1 = Math.min(fh - 1, r1);
+    if (C1 - C0 > 2 && R1 - R0 > 1) {
+      for (let c = C0; c <= C1; c++) { const ch = (c - C0) % 2 ? " " : "─"; g.put(ix + c, iy + R0, ch, "h"); g.put(ix + c, iy + R1, ch, "h"); }
+      for (let r = R0; r <= R1; r++) { const ch = (r - R0) % 2 ? " " : "│"; g.put(ix + C0, iy + r, ch, "h"); g.put(ix + C1, iy + r, ch, "h"); }
+      g.put(ix + C0, iy + R0, "┌", "h"); g.put(ix + C1, iy + R0, "┐", "h"); g.put(ix + C0, iy + R1, "└", "h"); g.put(ix + C1, iy + R1, "┘", "h");
+    }
+  }
+}
+// перевод точки схемы в знакоместо
+function figCell(x, y) {
+  const m = figMap; if (!m) return null;
+  return [m.ix + Math.floor((x - m.cx) * m.s + m.iw / 2), m.iy + Math.floor(((y - m.cy) * m.s + m.uh / 2) / 2)];
+}
+
+// ===================== меню и консоль =====================
+function menuRows(w) {
+  const rows = [];
+  const row = (act, num, name, cnt) => {
+    const on = act === "part:" + (current || ""), hov = hoverAct === act;
+    rows.push([pad(" " + num.padEnd(4) + name.toUpperCase(), w - 4) + cnt.padStart(3) + " ", on ? "i" : hov ? "h" : "", act]);
+  };
+  row("part:", "»", "Общий вид", "");
+  rows.push(["", "", ""]);
+  for (const p of BODY) row("part:" + p.id, p.num, p.title, String(countPart(p)));
+  return rows;
+}
+function consoleRows(w, h) {
+  const lines = [];
+  for (const [t, k] of consoleLog) wrap(t, w).forEach((l) => lines.push([l, k]));
+  return lines.slice(-h);
+}
+function drawConsoleInput(g, x, y, w) {
+  const v = $("cmd").value.toUpperCase(), max = w - 3;
+  const shown = v.length > max ? v.slice(v.length - max) : v;
+  g.put(x, y, "> ", "m", "cmd");
+  g.put(x + 2, y, shown, "h", "cmd");
+  g.put(x + 2 + shown.length, y, "█", "cur", "cmd");
+  if (!v) g.put(x + 4, y, "ПОМОЩЬ", "d", "cmd");
+  L.cmdPos = [x + 2, y, max];
+}
+
+// ===================== панель =====================
+// строит строки панели: [{t: [[ch, cl, act]...]}, {sep: "ЗАГОЛОВОК"}]
+function buildPanel(w) {
+  const rows = [], meta = { secRow: {}, cardRow: -1 };
+  const line = () => { const r = Array.from({ length: w }, () => [" ", "", ""]); rows.push({ t: r }); return r; };
+  const put = (r, x, str, cl = "", ac = "") => { let i = 0; for (const c of str) { if (x + i >= 0 && x + i < w) r[x + i] = [c, cl, ac]; i++; } };
+  const text = (str, cl = "", ac = "") => put(line(), 0, pad(str, w), cl, ac);
+  const wrapped = (str, cl = "") => wrap(str, w).forEach((l) => text(l, cl));
+  const blank = () => line();
+  const kv = (a, b, ka = "m", kb = "") => { const r = line(); put(r, 0, a, ka); const v = b.length > w - a.length - 1 ? b.slice(0, w - a.length - 1) : b; put(r, w - v.length, v, kb); };
+  const sep = (t) => rows.push({ sep: t });
+  const part = partOf(current);
+  if (!part) {
+    blank();
+    wrapped(L.wide ? "Выберите часть тела на схеме, в меню или командой. Экран переключится в рентген, справа откроются секции имплантов." : "Выберите часть тела вкладкой сверху или на схеме. Экран переключится в рентген, ниже откроются секции имплантов.");
+    blank();
+    wrapped("Импланты одной секции конфликтуют: легионеру ставится только один из них.");
+    blank();
+    if (L.wide) { wrapped("Наведите курсор на секцию, и выноска покажет её место на теле.", "m"); blank(); }
+    sep("РЕЕСТР");
+    blank();
+    const imps = allSections().reduce((n, s) => n + implantsOf(s).length, 0);
+    kv("ИМПЛАНТОВ В РЕЕСТРЕ", String(imps));
+    for (const [k, n] of RARITY) { const c = allSections().reduce((a, s) => a + implantsOf(s).filter((i) => i.rarity === k).length, 0); if (c) kv("  " + n, String(c)); }
+    blank();
+    return { rows, meta, title: "ИНСТРУКЦИЯ" };
+  }
+  const shownId = hoverAct.startsWith("imp:") ? hoverAct.slice(4) : picked[part.id];
+  const sel = findImp(part, shownId);
+  blank();
+  wrapped(part.desc, "m");
+  for (const s of part.sections) {
+    const list = implantsOf(s), sa = "sec:" + s.id, hs = hoverAct === sa;
+    blank();
+    meta.secRow[s.id] = rows.length;
+    const r = line(), right = list.length ? `[${list.length}]` : "[ПУСТО]", name = s.title.toUpperCase();
+    put(r, 0, name, hs ? "h" : "", sa);
+    put(r, name.length + 1, "─".repeat(Math.max(0, w - name.length - right.length - 2)), "d", sa);
+    put(r, w - right.length, right, list.length ? "m" : "d", sa);
+    text(s.note, "d", sa);
+    const per = Math.max(1, Math.floor((w + 1) / 7));
+    const cells = list.length ? list : [null];
+    for (let i = 0; i < cells.length; i += per) {
+      if (i) blank();
+      const a = line(), b = line(), c = line();
+      cells.slice(i, i + per).forEach((imp, j) => {
+        const x = j * 7;
+        if (!imp) { put(a, x, "┌────┐", "d", sa); put(b, x, "│ ·· │", "d", sa); put(c, x, "└────┘", "d", sa); put(b, x + 7, "импланты не внесены", "d", sa); return; }
+        const act = "imp:" + imp.id, on = picked[part.id] === imp.id, hv = hoverAct === act;
+        const cl = on ? "i" : hv ? "h" : "m", ic = pad(imp.icon || imp.name[0].toUpperCase(), 2);
+        put(a, x, "┌────┐", cl, act); put(b, x, "│ " + ic + " │", on ? "i" : hv ? "h" : "", act); put(c, x, "└────┘", cl, act);
+      });
+    }
+  }
+  blank();
+  sep("КАРТОЧКА");
+  blank();
+  meta.cardRow = rows.length;
+  if (!sel) {
+    wrapped(countPart(part) ? (L.wide ? "Наведите курсор на ячейку импланта или нажмите на неё." : "Нажмите на ячейку импланта.") : "Для этой части тела импланты ещё не внесены в реестр.", "d");
+  } else {
+    const [s, imp] = sel;
+    const fx = cardFx && cardFx.id === imp.id && !cardFx.done ? cardFx : null;
+    const start = rows.length;
+    if (fx && fx.phase === "req") text("ЗАПРОС К РЕЕСТРУ" + ".".repeat(1 + (fx.t >> 2) % 3), "m");
+    else {
+      wrap(imp.name.toUpperCase(), w).forEach((l) => text(l, "h"));
+      blank();
+      if (imp.rarity) kv("РЕДКОСТЬ", rarityName(imp.rarity), "m", "h");
+      if (imp.type) kv("ТИП", TYPES[imp.type] || imp.type.toUpperCase());
+      if (imp.cd) kv("ПЕРЕЗАРЯДКА", imp.cd + " С");
+      kv("СЕКЦИЯ", s.title.toUpperCase());
+      implantsOf(s).filter((i) => i.id !== imp.id).forEach((o, i) => kv(i ? "" : "КОНФЛИКТ", o.name));
+      if (imp.func) { blank(); text("ФУНКЦИЯ", "m"); wrapped(imp.func, "h"); }
+      if (imp.desc) { blank(); text("ОПИСАНИЕ", "m"); wrapped(imp.desc); }
+      if (fx) { fx.total = rows.length - start; rows.length = Math.min(rows.length, start + fx.rows); }
+    }
+  }
+  // место под карточку всегда равно самой длинной карточке этой части тела:
+  // панель не меняет высоту при наведении на другой имплант, и прокрутка не прыгает
+  const cardH = Math.max(1, ...part.sections.flatMap((s) => implantsOf(s).map((i) => cardHeight(s, i, w))));
+  while (rows.length < meta.cardRow + cardH) blank();
+  blank();
+  return { rows, meta, title: `${part.num} · ${part.title.toUpperCase()} · ${part.lat}` };
+}
+function cardHeight(s, imp, w) {
+  let n = wrap(imp.name.toUpperCase(), w).length + 1 + (imp.rarity ? 1 : 0) + (imp.type ? 1 : 0) + (imp.cd ? 1 : 0) + 1;
+  n += Math.max(0, implantsOf(s).length - 1);
+  if (imp.func) n += 2 + wrap(imp.func, w).length;
+  if (imp.desc) n += 2 + wrap(imp.desc, w).length;
+  return n;
+}
+function drawPanel(g, R, P) {
+  const iw = R.w - 2, ih = R.h - 2;
+  const n = P.rows.length;
+  panelRows = n;
+  const maxScroll = Math.max(0, n - ih);
+  // после выбора импланта панель сама прокручивается к карточке
+  // прокручиваем к карточке, только если её почти не видно, и не держим прокрутку
+  if (scrollToCard && L.wide && P.meta.cardRow > 0) {
+    if (P.meta.cardRow > panelScroll + ih - 8) panelScroll = Math.min(P.meta.cardRow - 2, Math.max(0, n + 12 - ih));
+    scrollToCard = false;
+  }
+  panelScroll = Math.max(0, Math.min(panelScroll, maxScroll));
+  g.box(R.x, R.y, R.w, R.h, P.title);
+  if (panelScroll > 0) g.put(R.x + R.w - 1, R.y + 1, "▲", "h", "scroll:-1");
+  if (panelScroll < maxScroll) g.put(R.x + R.w - 1, R.y + R.h - 2, "▼", "h", "scroll:1");
+  for (let j = 0; j < ih; j++) {
+    const idx = j + panelScroll, row = P.rows[idx];
+    if (!row || idx >= panelReveal) continue;
+    const y = R.y + 1 + j;
+    if (row.sep) { g.sep(R.x, y, R.w, row.sep); continue; }
+    row.t.forEach(([c, cl, ac], i) => { const k = y * g.w + R.x + 2 + i; if (R.x + 2 + i < R.x + R.w - 2) { g.ch[k] = c; g.cl[k] = cl; g.ac[k] = ac; } });
+  }
+  return { rowY: (idx) => (idx - panelScroll >= 0 && idx - panelScroll < ih ? R.y + 1 + idx - panelScroll : null) };
+}
+
+// ===================== выноска (11) =====================
+function drawLeader(g, P, pv) {
+  if (!L.wide || !current || figFx) return;
+  let secId = hoverAct.startsWith("sec:") ? hoverAct.slice(4) : null;
+  if (hoverAct.startsWith("imp:")) { const f = findImp(partOf(current), hoverAct.slice(4)); if (f) secId = f[0].id; }
+  if (!secId || !ANCHORS[secId]) return;
+  const sy = pv.rowY(P.meta.secRow[secId]); if (sy == null) return;
+  const F = L.fig, xR = L.panel.x - 1, vx = F.x + F.w - 3;
+  const pts = ANCHORS[secId].map(([x, y]) => figCell(x, y)).filter(Boolean)
+    .map(([c, r]) => [Math.max(F.x + 1, Math.min(F.x + F.w - 2, c)), Math.max(F.y + 1, Math.min(F.y + F.h - 3, r))]);
+  if (!pts.length) return;
+  const ys = pts.map((p) => p[1]).concat(sy), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  for (let x = vx + 1; x <= xR; x++) g.put(x, sy, "─", "h");
+  for (let y = y0; y <= y1; y++) g.put(vx, y, "│", "h");
+  for (const [ax, ay] of pts) {
+    const dir = ax < vx ? -1 : 1;
+    for (let x = vx + dir; dir < 0 ? x > ax : x < ax; x += dir) g.put(x, ay, "─", "h");
+    g.put(ax, ay, "■", "h");
+    g.put(vx, ay, ay === y0 ? (sy === y0 && ay !== sy ? "┤" : "┐") : ay === y1 ? "┘" : "┤", "h");
+  }
+  g.put(vx, sy, sy === y0 ? (pts.some((p) => p[1] === sy) ? "┼" : "┌") : sy === y1 ? "└" : "├", "h");
+}
+
+// ===================== узкий экран: вкладки и кнопки =====================
+function drawTabs(g, T) {
+  const n = T.n, w = Math.floor((L.cols - (n - 1)) / n);
+  BODY.forEach((p, i) => {
+    const x = (i % n) * (w + 1), y = T.y + Math.floor(i / n) * 3, act = "part:" + p.id;
+    const on = current === p.id, hv = hoverAct === act;
+    g.box(x, y, w, 3, "", "", on ? "h" : "m", act);
+    const cnt = String(countPart(p));
+    g.put(x + 1, y + 1, pad(" " + p.num.padEnd(4) + p.title.toUpperCase(), w - 3 - cnt.length) + cnt + " ", on ? "i" : hv ? "h" : "", act);
+  });
+}
+function btnItems() {
+  return [["ESC", "ОБЩИЙ ВИД"], ["F3", "ЗВУК " + (Snd.on ? "ВКЛ" : "ВЫКЛ")], ["F4", "РАЗВЁРТКА " + ["ВЫКЛ", "1", "2", "3"][scanLv]]];
+}
+function drawBtns(g, y0) {
+  const n = 3;
+  const w = Math.floor((L.cols - (n - 1)) / n);
+  btnItems().forEach(([k, label], i) => {
+    const x = (i % n) * (w + 1), y = y0 + Math.floor(i / n) * 3, act = "key:" + k, hv = hoverAct === act;
+    const off = k === "ESC" && !current;
+    g.box(x, y, w, 3, "", "", off ? "d" : "m", off ? "" : act);
+    g.put(x + Math.max(1, Math.floor((w - label.length) / 2)), y + 1, label, off ? "d" : hv ? "h" : "", off ? "" : act);
+  });
+}
+
+// ===================== строка клавиш (8) =====================
+function keyItems() {
+  return [
+    ["ESC", "ОБЩИЙ ВИД"], ["F1", "ПОМОЩЬ"], ["F3", "ЗВУК " + (Snd.on ? "ВКЛ" : "ВЫКЛ")],
+    ["F4", "РАЗВЁРТКА " + ["ВЫКЛ", "1", "2", "3"][scanLv]], ["F5", "ДРОЖАНИЕ* " + (jitter ? "ВКЛ" : "ВЫКЛ")],
+  ];
+}
+function drawKeys(g, y, w, wrapRows) {
+  let x = 0, row = y;
+  for (const [k, label] of keyItems()) {
+    const act = "key:" + k, hv = hoverAct === act, len = k.length + 1 + label.length;
+    if (x && x + 3 + len > w) { if (!wrapRows) break; row++; x = 0; }
+    if (x) { g.put(x, row, " │ ", "d"); x += 3; }
+    g.put(x, row, k, hv ? "h" : "m", act); g.put(x + k.length, row, " " + label, hv ? "h" : "", act);
+    x += len;
+  }
+  return row - y + 1;
+}
+
+// ===================== отрисовка экрана =====================
+function render() {
+  if (!L) L = layout();
+  const P = buildPanel(Math.max(10, L.panel.w - 4));
+  let rows = L.rows;
+  L.cmdPos = null;
+  if (!L.wide) {
+    L.panel.h = P.rows.length + 2;
+    L.btnY = L.panel.y + L.panel.h + 1;
+    rows = L.btnY + Math.ceil(btnItems().length / 3) * 3;
+  }
+  const g = new Grid(L.cols, rows);
+  // линия под шапкой с осадной полосой легиона
+  g.put(0, L.sepY, "─".repeat(L.cols), "d");
+  g.put(0, L.sepY, "▄▀▄▀▄▀▄▀", "m");
+  drawFig(g, L.fig);
+  if (L.wide) {
+    const R = L.left, iw = R.w - 4;
+    g.box(R.x, R.y, R.w, R.h, "СЕГМЕНТЫ");
+    // пункты меню через строку: крупнее мишень, спокойнее ритм
+    menuRows(R.w - 2).filter(([t]) => t).forEach(([t, cl, ac], i) => g.put(R.x + 1, R.y + 2 + i * 2 + (i ? 1 : 0), t, cl, ac));
+    const conTop = R.y + 14;
+    g.sep(R.x, conTop, R.w, "КОНСОЛЬ");
+    const logH = R.y + R.h - 2 - conTop - 2;
+    consoleRows(iw, logH).forEach(([t, k], i, a) => g.put(R.x + 2, conTop + 1 + logH - a.length + i, t, k));
+    drawConsoleInput(g, R.x + 2, R.y + R.h - 2, iw);
+  } else drawTabs(g, L.tabs);
+  const pv = drawPanel(g, L.panel, P);
+  if (L.wide) { drawLeader(g, P, pv); drawKeys(g, L.keysY, L.cols, false); }
+  else drawBtns(g, L.btnY);
+  $("scr").innerHTML = g.html();
+  lastGrid = g;
+  // невидимое поле ввода стоит ровно на строке консоли
+  const inp = $("cmd");
+  if (L.cmdPos) { const [cx, cy, cw] = L.cmdPos; inp.hidden = false; inp.style.left = cx * CW + "px"; inp.style.top = cy * CH + "px"; inp.style.width = cw * CW + "px"; }
+  else { inp.hidden = true; if (document.activeElement === inp) inp.blur(); }
+}
+
+// ===================== один такт для всех анимаций (10) =====================
+// 1 такт = 16 мс. Луч рисует одну строку за такт, панель печатается по строке за такт.
+const TICK = 16;
+let tickT = 0;
+function ensureTick() { if (!tickT) tickT = setInterval(tick, TICK); }
+function tick() {
+  let busy = false;
+  if (figFx) { busy = true; stepFig(); }
+  if (panelReveal < panelRows) { panelReveal++; if (panelReveal % 3 === 0) Snd.tick(); busy = true; }
+  if (cardFx && !cardFx.done) { busy = true; stepCard(); }
+  render();
+  if (!busy) { clearInterval(tickT); tickT = 0; }
+}
+function redrawFig(next, xray) {
+  if (reduce) { figView = next; figXray = xray; figFx = null; render(); return; }
+  Snd.disk(false);
+  figFx = { phase: next === figView ? "collapse" : "target", t: 0, next, xray, blink: true, pass: 0, row: 0, pct: 0 };
+  if (figFx.phase === "collapse") Snd.relay();
+  ensureTick();
+}
+function stepFig() {
+  const fx = figFx; fx.t++;
+  if (fx.phase === "target") {
+    fx.blink = Math.floor(fx.t / 4) % 2 === 0;
+    if (fx.t >= 20) { fx.phase = "collapse"; fx.t = 0; Snd.relay(); }
+  } else if (fx.phase === "collapse") {
+    if (fx.t >= 6) { fx.phase = "raster"; fx.t = 0; fx.row = 0; fx.pass = 0; Snd.disk(true); }
+  } else if (fx.phase === "raster") {
+    const fh = L.fig.h - 3;
+    fx.row += 2;
+    if (fx.row >= fh) {
+      if (fx.pass === 0) { fx.pass = 1; fx.row = 1; }
+      else { figView = fx.next; figXray = fx.xray; figFx = null; Snd.disk(false); return; }
+    }
+    fx.pct = (fx.pass * fh + fx.row) / (2 * fh);
+  }
+}
+function startCard(id) {
+  if (reduce || (cardFx && cardFx.id === id)) return;
+  cardFx = { id, phase: "req", t: 0, rows: 0, total: 1e9, done: false };
+  ensureTick();
+}
+function stepCard() {
+  const fx = cardFx; fx.t++;
+  if (fx.phase === "req") { if (fx.t >= 12) { fx.phase = "data"; fx.t = 0; } return; }
+  fx.rows++;
+  if (fx.rows % 2 === 0) Snd.tick();
+  if (fx.rows >= fx.total) fx.done = true;
+}
+
+// ===================== выбор части =====================
+function select(id) {
+  const part = partOf(id);
+  const changed = (part ? part.id : null) !== current;
+  current = part ? part.id : null;
+  if (changed) {
+    hoverAct = ""; cardFx = null; panelScroll = 0;
+    panelReveal = reduce ? 1e9 : 0;
+    clog(part ? `ДОСТУП: ${part.title.toUpperCase()} · ${part.lat}` : "ВОЗВРАТ: ОБЩИЙ ВИД", "");
+    Snd.key();
+    redrawFig(part ? part.id : "full", part ? part.id : null);
+  }
+  $("title").textContent = part ? part.title.toUpperCase() : "ОБЩИЙ ВИД";
+  $("sub").textContent = part ? `СЕГМЕНТ ${part.num} · ${part.lat} · РЕНТГЕН` : `${imperialDate()} · ВЫБЕРИТЕ СЕГМЕНТ`;
+  const want = current ? "#" + current : "";
+  if (location.hash !== want) { try { history.replaceState(null, "", want || location.pathname + location.search); } catch (e) {} }
+  render();
+  ensureTick();
+}
+function pick(id) {
+  if (!current) return;
+  if (picked[current] !== id) startCard(id);
+  picked[current] = id;
+  scrollToCard = true;
+  Snd.key();
+  render();
+  if (!L.wide && scrollToCard) {
+    scrollToCard = false;
+    const P = buildPanel(Math.max(10, L.panel.w - 4));
+    const y = $("scr").getBoundingClientRect().top + scrollY + (L.panel.y + 1 + P.meta.cardRow - 3) * CH;
+    scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
+  }
+}
+let scrollToCard = false;
+
+// ===================== консоль и команды (14, 15) =====================
+const CLOG_MAX = 40;
+function clog(text, k = "m") { consoleLog.push([text, k]); while (consoleLog.length > CLOG_MAX) consoleLog.shift(); if (L) render(); }
+const imperialDate = () => {
+  const d = new Date(), start = new Date(d.getFullYear(), 0, 1);
+  return "0 " + String(Math.floor(((d - start) / (365.25 * 864e5)) * 1000)).padStart(3, "0") + " 004.M31";
+};
+function setScan(n) { scanLv = n; document.documentElement.style.setProperty("--scan", [0, .16, .3, .45][scanLv]); try { localStorage.setItem("cog-scan", String(scanLv)); } catch (e) {} render(); }
+function toggleSound() { Snd.set(!Snd.on); if (Snd.on) Snd.degauss(); render(); }
+const HELP = ["ГОЛОВА ТОРС РУКИ НОГИ ОБЩИЙ", "ЗВУК РАЗВЁРТКА 0-3", "ДРОЖАНИЕ ДАТА ЛИТАНИЯ", "РЕЕСТР ВЫКЛЮЧИТЬ ОЧИСТИТЬ", "КЛАВИШИ: ESC F1 F3-F5"];
+const CMD = {
+  "ПОМОЩЬ": () => HELP,
+  "ОБЩИЙ": () => { select(null); },
+  "ЗВУК": () => { toggleSound(); return "ЗВУК: " + (Snd.on ? "ВКЛ" : "ВЫКЛ"); },
+  "РАЗВЁРТКА": (arg) => { const n = parseInt(arg, 10); setScan(n >= 0 && n <= 3 ? n : (scanLv + 1) % 4); return "РАЗВЁРТКА: " + ["ВЫКЛ", "1", "2", "3"][scanLv]; },
+  "ДРОЖАНИЕ": () => { setJitter(!jitter); render(); return "ДРОЖАНИЕ: " + (jitter ? "ВКЛ" : "ВЫКЛ"); },
+  "ДАТА": () => "ИМПЕРСКАЯ ДАТА: " + imperialDate(),
+  "ЛИТАНИЯ": () => { const l = LEGION.litanies || [LEGION.motto]; return "++ " + l[Math.floor(Math.random() * l.length)].toUpperCase() + " ++"; },
+  "РЕЕСТР": () => BODY.map((p) => `${p.num.padEnd(4)}${p.title.toUpperCase().padEnd(8)}${String(countPart(p)).padStart(3)} ИМПЛ.`),
+  "ОЧИСТИТЬ": () => { consoleLog.length = 0; },
+  "ВЫКЛЮЧИТЬ": () => { setTimeout(powerOff, 200); return "ГАШЕНИЕ ТРУБКИ..."; },
+  "ОМНИССИЯ": () => "СЛАВА ОМНИССИИ. ДУХ МАШИНЫ ДОВОЛЕН.",
+  "ЖЕЛЕЗО": () => "«" + LEGION.motto.toUpperCase() + "»",
+  "ПЕРТУРАБО": () => "ПРИМАРХ НАБЛЮДАЕТ. РАБОТАЙТЕ.",
+  "ХОРУС": () => "ЗАПРОС ОТКЛОНЁН. ОБРАЩЕНИЕ ЗАФИКСИРОВАНО.",
+};
+const ALIAS = { "?": "ПОМОЩЬ", "HELP": "ПОМОЩЬ", "ОБЗОР": "ОБЩИЙ", "НАЗАД": "ОБЩИЙ", "0": "ОБЩИЙ", "CLS": "ОЧИСТИТЬ", "CLEAR": "ОЧИСТИТЬ", "РАЗВЕРТКА": "РАЗВЁРТКА" };
+const cmdHist = []; let histI = 0;
+function runCmd(raw) {
+  const line = raw.trim().toUpperCase(); if (!line) return;
+  cmdHist.push(line); histI = cmdHist.length;
+  clog("> " + line, "");
+  const [w0, arg] = line.split(/\s+/), w = ALIAS[w0] || w0;
+  const part = BODY.find((p) => p.title.toUpperCase() === w || p.id.toUpperCase() === w || p.num === w || String(BODY.indexOf(p) + 1) === w);
+  if (part) { select(part.id); return; }
+  const fn = CMD[w];
+  if (!fn) { clog("НЕИЗВЕСТНАЯ КОМАНДА · F1 — ПОМОЩЬ"); return; }
+  const out = fn(arg);
+  if (out) [].concat(out).forEach((l) => clog(l, "h"));
+  render();
+}
+const cmd = $("cmd");
+cmd.addEventListener("input", () => render());
+cmd.addEventListener("keydown", (e) => {
+  if (e.key.length === 1 || e.key === "Backspace") Snd.key();
+  if (e.key === "Enter") { e.preventDefault(); runCmd(cmd.value); cmd.value = ""; render(); }
+  else if (e.key === "ArrowUp" && cmdHist.length) { e.preventDefault(); histI = Math.max(0, histI - 1); cmd.value = cmdHist[histI]; render(); }
+  else if (e.key === "ArrowDown" && cmdHist.length) { e.preventDefault(); histI = Math.min(cmdHist.length, histI + 1); cmd.value = cmdHist[histI] || ""; render(); }
+});
+const KEYS = { ESC: () => select(null), F1: () => HELP.forEach((l) => clog(l, "h")), F3: toggleSound, F4: () => setScan((scanLv + 1) % 4), F5: () => { setJitter(!jitter); render(); } };
+document.addEventListener("keydown", (e) => {
+  const k = e.key === "Escape" ? "ESC" : /^F[1345]$/.test(e.key) ? e.key : null;
+  if (k) { e.preventDefault(); if (k !== "ESC" || current) { Snd.key(); KEYS[k](); } if (k === "ESC") cmd.blur(); return; }
+  if (e.key === "PageDown" || e.key === "PageUp") { panelScroll += e.key === "PageDown" ? 8 : -8; render(); e.preventDefault(); return; }
+  if (e.target === cmd || !L.wide || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === " ") return;
+  cmd.focus();
+});
+
+// ===================== мышь =====================
+const scr = $("scr");
+// действие под указателем берём по координатам из сетки знакомест:
+// экран перерисовывается каждый такт, и элемент под пальцем успевает смениться между нажатием и отпусканием
+let lastGrid = null;
+function actAt(e) {
+  if (!lastGrid) return "";
+  const r = scr.getBoundingClientRect();
+  const c = Math.floor((e.clientX - r.left) / CW), y = Math.floor((e.clientY - r.top) / CH);
+  if (c < 0 || y < 0 || c >= lastGrid.w || y >= lastGrid.h) return "";
+  return lastGrid.ac[y * lastGrid.w + c] || "";
+}
+scr.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse") return;   // на сенсорном экране наведения нет
+  const act = actAt(e);
+  if (act === hoverAct) return;
+  hoverAct = act;
+  if (act.startsWith("imp:")) { Snd.key(); startCard(act.slice(4)); }
+  render();
+});
+scr.addEventListener("mouseleave", () => { if (hoverAct) { hoverAct = ""; render(); } });
+scr.addEventListener("mousedown", (e) => { if (e.detail > 1) e.preventDefault(); });   // двойной клик не выделяет слово
+// своё «нажатие»: браузерный click теряется, если элемент под курсором перерисовался между нажатием и отпусканием
+let downAt = null;
+scr.addEventListener("pointerdown", (e) => { if (e.button === 0) downAt = [e.clientX, e.clientY, actAt(e)]; });
+scr.addEventListener("pointercancel", () => { downAt = null; });
+scr.addEventListener("pointerup", (e) => {
+  if (!downAt) return;
+  const [x0, y0, act0] = downAt; downAt = null;
+  if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) return;   // это была прокрутка пальцем
+  const act = actAt(e) || act0;
+  if (act !== act0) return;
+  press(act);
+});
+function press(act) {
+  if (act.startsWith("part:")) { const id = act.slice(5) || null; select(!L.wide && id === current ? null : id); }
+  else if (act.startsWith("imp:")) pick(act.slice(4));
+  else if (act.startsWith("key:")) { Snd.key(); KEYS[act.slice(4)](); }
+  else if (act.startsWith("scroll:")) { panelScroll += +act.slice(7) * 8; render(); }
+  else if (act === "cmd") cmd.focus();
+}
+scr.addEventListener("wheel", (e) => {
+  if (!L || !L.wide) return;
+  const col = Math.floor((e.clientX - scr.getBoundingClientRect().left) / CW);
+  if (col < L.panel.x) return;
+  e.preventDefault();
+  panelScroll += Math.sign(e.deltaY) * 3;
+  render();
+}, { passive: false });
+
+// ===================== звук (по желанию) =====================
+// Всё собрано из шума и коротких затухающих резонансов: щелчки реле,
+// клавиши, треск дисковода, сетевой гул и писк строчной развёртки кинескопа.
+const Snd = (() => {
+  let ctx = null, on = false, bed = null, diskT = 0, noiseBuf = null;
+  try { on = localStorage.getItem("cog-sound") === "1"; } catch (e) {}
+  const ensure = () => {
+    if (!on) return null;
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (ctx.state === "suspended") ctx.resume();
+    if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    if (!bed) startBed();
+    return ctx;
+  };
+  // короткий удар шума через фильтр: основа всех механических звуков
+  function burst(t, { type = "bandpass", f = 2000, q = 1, gain = .2, len = .02, attack = .001 } = {}) {
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf;
+    const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+    n.connect(fl); fl.connect(g); g.connect(ctx.destination);
+    n.start(t, Math.random() * 1.5); n.stop(t + len + .02);
+  }
+  // фон: сетевой гул трансформатора с гармониками и едва слышный писк строчника
+  function startBed() {
+    const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+    master.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.2);
+    const mains = ctx.createOscillator(); mains.type = "square"; mains.frequency.value = 50;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 260; lp.Q.value = .7;
+    const gm = ctx.createGain(); gm.gain.value = .006; mains.connect(lp); lp.connect(gm); gm.connect(master);
+    const whine = ctx.createOscillator(); whine.frequency.value = 15625;
+    const gw = ctx.createGain(); gw.gain.value = .0025; whine.connect(gw); gw.connect(master);
+    const hiss = ctx.createBufferSource(); hiss.buffer = noiseBuf; hiss.loop = true;
+    const hf = ctx.createBiquadFilter(); hf.type = "highpass"; hf.frequency.value = 5000;
+    const gh = ctx.createGain(); gh.gain.value = .0018; hiss.connect(hf); hf.connect(gh); gh.connect(master);
+    mains.start(); whine.start(); hiss.start();
+    bed = { master, nodes: [mains, whine, hiss] };
+  }
+  function stopBed() { if (!bed) return; const b = bed; bed = null; b.master.gain.linearRampToValueAtTime(0, ctx.currentTime + .15); setTimeout(() => b.nodes.forEach((n) => n.stop()), 250); }
+  return {
+    get on() { return on; },
+    set(v) { on = v; try { localStorage.setItem("cog-sound", v ? "1" : "0"); } catch (e) {} if (v) ensure(); else { this.disk(false); if (ctx) stopBed(); } },
+    wake() { if (on) ensure(); },
+    // печать на экран: еле слышный треск
+    tick() { if (!ensure()) return; burst(ctx.currentTime, { f: 5200 + Math.random() * 1500, q: 3, gain: .025, len: .008 }); },
+    // клавиша: стук колпачка и щелчок пружины
+    key() {
+      if (!ensure()) return; const t = ctx.currentTime;
+      burst(t, { type: "lowpass", f: 420, q: 1.5, gain: .16, len: .035 });
+      burst(t + .002, { f: 3200 + Math.random() * 600, q: 2.5, gain: .07, len: .012 });
+      burst(t + .045 + Math.random() * .02, { type: "lowpass", f: 700, q: 1, gain: .05, len: .02 });
+    },
+    // реле переключения режима: два металлических щелчка с дребезгом
+    relay() {
+      if (!ensure()) return; const t = ctx.currentTime;
+      burst(t, { f: 2600, q: 9, gain: .22, len: .03 });
+      burst(t + .006, { type: "lowpass", f: 300, q: 2, gain: .12, len: .04 });
+      burst(t + .028, { f: 3100, q: 9, gain: .1, len: .02 });
+    },
+    // дисковод: хаотичный треск головки, пока идёт прорисовка
+    disk(start) {
+      clearTimeout(diskT);
+      if (!start || !ensure()) return;
+      const seek = () => {
+        if (!on) return; const t = ctx.currentTime;
+        burst(t, { f: 900 + Math.random() * 700, q: 6, gain: .05 + Math.random() * .04, len: .012 });
+        if (Math.random() < .3) burst(t + .01, { type: "lowpass", f: 180, q: 3, gain: .06, len: .05 });
+        diskT = setTimeout(seek, 18 + Math.random() * 55);
+      };
+      seek();
+    },
+    // треск помехи при сбое развёртки
+    crackle() {
+      if (!ensure()) return; const t = ctx.currentTime, n = 4 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) burst(t + Math.random() * .12, { type: "highpass", f: 2500 + Math.random() * 3000, q: .7, gain: .04 + Math.random() * .07, len: .004 + Math.random() * .015 });
+    },
+    // щелчок выключателя и глухой удар при гашении трубки
+    off() {
+      if (!ensure()) return; const t = ctx.currentTime;
+      burst(t, { f: 2800, q: 8, gain: .18, len: .025 });
+      burst(t + .01, { type: "lowpass", f: 110, q: 3, gain: .3, len: .3 });
+    },
+    // размагничивание кинескопа при включении звука: глухой «бум» с затухающим гулом
+    degauss() {
+      if (!ensure()) return; const t = ctx.currentTime;
+      burst(t, { type: "lowpass", f: 140, q: 4, gain: .35, len: .25 });
+      const o = ctx.createOscillator(); o.type = "square"; o.frequency.value = 50;
+      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 220;
+      const g = ctx.createGain(); g.gain.setValueAtTime(.09, t); g.gain.exponentialRampToValueAtTime(.0001, t + 1.1);
+      o.connect(lp); lp.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 1.2);
+    },
+  };
+})();
+
+
+// ===================== литании (11: ритм кратен такту) =====================
+function startLitanies() {
+  const list = (LEGION.litanies && LEGION.litanies.length ? LEGION.litanies : [LEGION.motto]).map((l) => "++ " + l.toUpperCase() + " ++");
+  let i = 0, typing = 0;
+  const show = (txt) => {
+    clearInterval(typing);
+    const el = $("lit");
+    if (reduce) { el.textContent = txt; return; }
+    let n = 0; el.textContent = "";
+    typing = setInterval(() => { el.textContent = txt.slice(0, ++n); if (n >= txt.length) clearInterval(typing); }, TICK * 2);
+  };
+  show(list[0]);
+  setInterval(() => { i = (i + 1) % list.length; show(list[i]); }, 7000);
+}
+
+// ===================== 6, 7, 8, 9: живая нестабильность =====================
+let screenOn = true;
+function flicker() {
+  if (screenOn && !reduce) $("flick").animate([{ opacity: 0 }, { opacity: .07 }, { opacity: .02 }, { opacity: .05 }, { opacity: 0 }], { duration: 180 + Math.random() * 120 });
+  setTimeout(flicker, 2500 + Math.random() * 5500);
+}
+function glitch() {
+  if (screenOn && !reduce) {
+    const band = $("gband"), y = Math.random() * innerHeight;
+    band.style.top = y + "px"; band.style.height = 2 + Math.floor(Math.random() * 6) + "px"; band.hidden = false;
+    $("term").animate([{ transform: "translateX(0)" }, { transform: "translateX(5px) skewX(-1deg)" }, { transform: "translateX(-3px)" }, { transform: "translateX(2px)" }, { transform: "translateX(0)" }], { duration: 160, easing: "steps(4)" });
+    Snd.crackle();
+    setTimeout(() => { band.hidden = true; }, 110);
+  }
+  setTimeout(glitch, 40000 + Math.random() * 40000);
+}
+let jitter = false, jitT = 0;
+try { jitter = localStorage.getItem("cog-jit") === "1"; } catch (e) {}
+function setJitter(v) {
+  jitter = v && !reduce;
+  try { localStorage.setItem("cog-jit", jitter ? "1" : "0"); } catch (e) {}
+  clearInterval(jitT); $("term").style.translate = "";
+  if (jitter) jitT = setInterval(() => { const r = Math.random(); $("term").style.translate = (r < .7 ? 0 : r < .85 ? 1 : -1) + "px 0"; }, 70);
+}
+
+
+function hideLead() { hoverAct = ""; }
+// ===================== 10, 11: включение и гашение трубки =====================
+async function powerOn(target) {
+  const pw = $("power");
+  screenOn = true;
+  pw.querySelector("i").style.display = "none";
+  if (reduce) { pw.hidden = true; return; }
+  pw.hidden = false;
+  Snd.degauss();
+  // чёрная заслонка плавно уходит, а изображение набирает яркость, как прогревающаяся трубка
+  const veil = pw.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, easing: "ease-out", fill: "forwards" });
+  const warm = target.animate([{ filter: "brightness(.35) blur(1px)" }, { filter: "brightness(.8) blur(.4px)", offset: .5 }, { filter: "brightness(1) blur(0)" }], { duration: 1100, easing: "ease-out" });
+  await veil.finished.catch(() => {});
+  pw.hidden = true; veil.cancel();
+  await warm.finished.catch(() => {});
+}
+async function powerOff() {
+  if (!screenOn || reduce) return;
+  screenOn = false; hideLead(); Snd.off(); Snd.disk(false);
+  const term = $("term"), pw = $("power"), dot = pw.querySelector("i");
+  const a = term.animate([{ transform: "scaleY(1)", filter: "brightness(1)" }, { transform: "scaleY(.006)", filter: "brightness(1.4)" }], { duration: 160, easing: "ease-in", fill: "forwards" });
+  await a.finished.catch(() => {});
+  pw.hidden = false; dot.style.display = "";
+  await dot.animate([{ width: "60vw", height: "2px", opacity: .8 }, { width: "4px", height: "4px", opacity: .6, offset: .55 }, { width: "2px", height: "2px", opacity: 0 }], { duration: 600, easing: "ease-in", fill: "forwards" }).finished.catch(() => {});
+  a.cancel(); dot.getAnimations().forEach((x) => x.cancel()); dot.style.display = "none";
+}
+let hadFocus = false;
+const wake = () => { if (!screenOn) powerOn($("term")); };
+window.addEventListener("blur", () => { if (hadFocus) powerOff(); });
+window.addEventListener("focus", () => { hadFocus = true; wake(); });
+document.addEventListener("pointerdown", () => { hadFocus = true; wake(); }, true);
+document.addEventListener("keydown", () => { hadFocus = true; wake(); }, true);
+
+
+// ===================== 13: курсор-прицел со следом =====================
+if (matchMedia("(pointer: fine)").matches && !reduce) {
+  document.documentElement.classList.add("cc");
+  const cur = $("cur"), N = 6, trail = [], hist = [];
+  for (let i = 0; i < N; i++) { const t = document.createElement("div"); t.className = "trl"; t.style.opacity = 0; document.body.appendChild(t); trail.push(t); }
+  let mx = -99, my = -99, inside = false;
+  document.addEventListener("pointermove", (e) => {
+    mx = e.clientX; my = e.clientY; inside = true; cur.hidden = false;
+    const el = e.target;
+    cur.classList.toggle("on", !!(el.closest && el.closest("button, [data-act]:not([data-act^='sec:']), .part, .mn")));
+    cur.classList.toggle("txt", !!(el.closest && el.closest("input")));
+  });
+  document.addEventListener("pointerleave", () => { inside = false; cur.hidden = true; trail.forEach((t) => (t.style.opacity = 0)); });
+  document.documentElement.addEventListener("mouseleave", () => { inside = false; cur.hidden = true; trail.forEach((t) => (t.style.opacity = 0)); });
+  let lastMove = 0;
+  document.addEventListener("pointermove", () => { lastMove = performance.now(); });
+  const loop = (t) => {
+    if (inside && screenOn && t - lastMove < 400) {
+      cur.style.transform = `translate(${mx}px, ${my}px)`;
+      hist.unshift([mx, my]); hist.length = Math.min(hist.length, N * 2);
+      trail.forEach((t, i) => { const h = hist[(i + 1) * 2] || hist[hist.length - 1]; t.style.transform = `translate(${h[0]}px, ${h[1]}px)`; t.style.opacity = (0.45 * (1 - i / N)).toFixed(2); });
+    } else if (!screenOn) { cur.hidden = true; }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+
+function boot(done) {
+  let seen = false;
+  try { seen = sessionStorage.getItem("cog-booted") === "1"; sessionStorage.setItem("cog-booted", "1"); } catch (e) {}
+  if (seen || reduce) { powerOn($("term")); return done(); }
+  const el = $("boot"), n = allSections().length;
+  const lines = [
+    ["m", "КОГИТАТОР МОД. IV-Ω · КУЗНЯ ОЛИМПИИ"], ["", ""],
+    ["h", "++ ПРОБУЖДЕНИЕ ДУХА МАШИНЫ ++"], ["", ""],
+    ["", "ПРОВЕРКА ЛИТАНИЙ ................ [ OK ]"],
+    ["", "ЗАГРУЗКА СХЕМЫ ЛЕГИОНЕРА ........ [ OK ]"],
+    ["", `РЕЕСТР АУГМЕТИКИ: ${String(n).padStart(2)} СЕКЦИЙ ..... [ OK ]`],
+    ["", "СВЯЗЬ С IV ЛЕГИОНОМ ............. [ OK ]"], ["", ""],
+    ["h", "ДОСТУП РАЗРЕШЁН"],
+  ];
+  el.hidden = false;
+  powerOn(el);
+  let i = 0, timer = 0, finished = false;
+  const render = () => { el.innerHTML = lines.slice(0, i).map(([k, t]) => k ? `<span class="${k}">${t}</span>` : t).join("\n") + '<span class="cur">█</span>'; };
+  const finish = () => {
+    if (finished) return; finished = true;
+    clearInterval(timer); i = lines.length; render();
+    el.classList.add("out"); setTimeout(() => { el.hidden = true; }, 380);
+    done();
+  };
+  render();
+  timer = setInterval(() => { i++; Snd.tick(); render(); if (i >= lines.length) { clearInterval(timer); setTimeout(finish, 450); } }, 130);
+  el.addEventListener("click", finish);
+  document.addEventListener("keydown", finish, { once: true });
+}
+
+
+// ===================== запуск =====================
+let rz = 0;
+window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { pickCell(); L = layout(); render(); }, 80); });
+window.addEventListener("hashchange", () => { const id = location.hash.slice(1); if ((id || null) !== current) select(partOf(id) ? id : null); });
+
+$("cap").textContent = `${LEGION.numeral} ЛЕГИОН\n${LEGION.name.toUpperCase()}\n«${LEGION.motto.toUpperCase()}»`;
+$("emblem").innerHTML = EMB.map((row, y) => [...row].map((c, x) => (c === "X" ? `<rect x="${x}" y="${y}" width="1" height="1" fill="var(--fg)"/>` : "")).join("")).join("");
+document.documentElement.style.setProperty("--scan", [0, .16, .3, .45][scanLv]);
+pickCell();
+L = layout();
+setJitter(jitter);
+clog("КОГИТАТОР ГОТОВ");
+clog("ДАТА " + imperialDate());
+clog("F1 — СПИСОК КОМАНД");
+const start = location.hash.slice(1);
+const startPart = partOf(start) ? start : null;
+current = startPart; figView = startPart || "full"; figXray = startPart;
+select(startPart);
+if (document.fonts) document.fonts.ready.then(() => render());
+boot(() => { startLitanies(); setTimeout(flicker, 3000); setTimeout(glitch, 30000 + Math.random() * 30000); });
+</script>
+</body>
+</html>
