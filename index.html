@@ -140,6 +140,7 @@ body::after { /* сканлайны, цветная маска и виньетк
 </head>
 <body>
 
+
 <div class="term" id="term">
   <header class="head">
     <div>
@@ -630,7 +631,7 @@ function drawBtns(g, y0) {
 function keyItems() {
   return [
     ["ESC", "ОБЩИЙ ВИД"], ["F1", "ПОМОЩЬ"], ["F3", "ЗВУК " + (Snd.on ? "ВКЛ" : "ВЫКЛ")],
-    ["F4", "РАЗВЁРТКА " + ["ВЫКЛ", "1", "2", "3"][scanLv]], ["F5", "ДРОЖАНИЕ* " + (jitter ? "ВКЛ" : "ВЫКЛ")],
+    ["F4", "РАЗВЁРТКА " + ["ВЫКЛ", "1", "2", "3"][scanLv]],
   ];
 }
 function drawKeys(g, y, w, wrapRows) {
@@ -777,13 +778,12 @@ const imperialDate = () => {
 };
 function setScan(n) { scanLv = n; document.documentElement.style.setProperty("--scan", [0, .16, .3, .45][scanLv]); try { localStorage.setItem("cog-scan", String(scanLv)); } catch (e) {} render(); }
 function toggleSound() { Snd.set(!Snd.on); if (Snd.on) Snd.degauss(); render(); }
-const HELP = ["ГОЛОВА ТОРС РУКИ НОГИ ОБЩИЙ", "ЗВУК РАЗВЁРТКА 0-3", "ДРОЖАНИЕ ДАТА ЛИТАНИЯ", "РЕЕСТР ВЫКЛЮЧИТЬ ОЧИСТИТЬ", "КЛАВИШИ: ESC F1 F3-F5"];
+const HELP = ["ГОЛОВА ТОРС РУКИ НОГИ ОБЩИЙ", "ЗВУК РАЗВЁРТКА 0-3", "ДАТА ЛИТАНИЯ", "РЕЕСТР ВЫКЛЮЧИТЬ ОЧИСТИТЬ", "КЛАВИШИ: ESC F1 F3 F4"];
 const CMD = {
   "ПОМОЩЬ": () => HELP,
   "ОБЩИЙ": () => { select(null); },
   "ЗВУК": () => { toggleSound(); return "ЗВУК: " + (Snd.on ? "ВКЛ" : "ВЫКЛ"); },
   "РАЗВЁРТКА": (arg) => { const n = parseInt(arg, 10); setScan(n >= 0 && n <= 3 ? n : (scanLv + 1) % 4); return "РАЗВЁРТКА: " + ["ВЫКЛ", "1", "2", "3"][scanLv]; },
-  "ДРОЖАНИЕ": () => { setJitter(!jitter); render(); return "ДРОЖАНИЕ: " + (jitter ? "ВКЛ" : "ВЫКЛ"); },
   "ДАТА": () => "ИМПЕРСКАЯ ДАТА: " + imperialDate(),
   "ЛИТАНИЯ": () => { const l = LEGION.litanies || [LEGION.motto]; return "++ " + l[Math.floor(Math.random() * l.length)].toUpperCase() + " ++"; },
   "РЕЕСТР": () => BODY.map((p) => `${p.num.padEnd(4)}${p.title.toUpperCase().padEnd(8)}${String(countPart(p)).padStart(3)} ИМПЛ.`),
@@ -817,9 +817,9 @@ cmd.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowUp" && cmdHist.length) { e.preventDefault(); histI = Math.max(0, histI - 1); cmd.value = cmdHist[histI]; render(); }
   else if (e.key === "ArrowDown" && cmdHist.length) { e.preventDefault(); histI = Math.min(cmdHist.length, histI + 1); cmd.value = cmdHist[histI] || ""; render(); }
 });
-const KEYS = { ESC: () => select(null), F1: () => HELP.forEach((l) => clog(l, "h")), F3: toggleSound, F4: () => setScan((scanLv + 1) % 4), F5: () => { setJitter(!jitter); render(); } };
+const KEYS = { ESC: () => select(null), F1: () => HELP.forEach((l) => clog(l, "h")), F3: toggleSound, F4: () => setScan((scanLv + 1) % 4) };
 document.addEventListener("keydown", (e) => {
-  const k = e.key === "Escape" ? "ESC" : /^F[1345]$/.test(e.key) ? e.key : null;
+  const k = e.key === "Escape" ? "ESC" : /^F[134]$/.test(e.key) ? e.key : null;
   if (k) { e.preventDefault(); if (k !== "ESC" || current) { Snd.key(); KEYS[k](); } if (k === "ESC") cmd.blur(); return; }
   if (e.key === "PageDown" || e.key === "PageUp") { panelScroll += e.key === "PageDown" ? 8 : -8; render(); e.preventDefault(); return; }
   if (e.target === cmd || !L.wide || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === " ") return;
@@ -1001,15 +1001,6 @@ function glitch() {
   }
   setTimeout(glitch, 40000 + Math.random() * 40000);
 }
-let jitter = false, jitT = 0;
-try { jitter = localStorage.getItem("cog-jit") === "1"; } catch (e) {}
-function setJitter(v) {
-  jitter = v && !reduce;
-  try { localStorage.setItem("cog-jit", jitter ? "1" : "0"); } catch (e) {}
-  clearInterval(jitT); $("term").style.translate = "";
-  if (jitter) jitT = setInterval(() => { const r = Math.random(); $("term").style.translate = (r < .7 ? 0 : r < .85 ? 1 : -1) + "px 0"; }, 70);
-}
-
 
 function hideLead() { hoverAct = ""; }
 // ===================== 10, 11: включение и гашение трубки =====================
@@ -1039,8 +1030,6 @@ async function powerOff() {
 }
 let hadFocus = false;
 const wake = () => { if (!screenOn) powerOn($("term")); };
-window.addEventListener("blur", () => { if (hadFocus) powerOff(); });
-window.addEventListener("focus", () => { hadFocus = true; wake(); });
 document.addEventListener("pointerdown", () => { hadFocus = true; wake(); }, true);
 document.addEventListener("keydown", () => { hadFocus = true; wake(); }, true);
 
@@ -1114,7 +1103,6 @@ $("emblem").innerHTML = EMB.map((row, y) => [...row].map((c, x) => (c === "X" ? 
 document.documentElement.style.setProperty("--scan", [0, .16, .3, .45][scanLv]);
 pickCell();
 L = layout();
-setJitter(jitter);
 clog("КОГИТАТОР ГОТОВ");
 clog("ДАТА " + imperialDate());
 clog("F1 — СПИСОК КОМАНД");
@@ -1125,5 +1113,6 @@ select(startPart);
 if (document.fonts) document.fonts.ready.then(() => render());
 boot(() => { startLitanies(); setTimeout(flicker, 3000); setTimeout(glitch, 30000 + Math.random() * 30000); });
 </script>
+
 </body>
 </html>
