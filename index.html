@@ -3,19 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="version" content="202611121516">
 <title>Когитатор аугметики</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-@font-face { font-family: "T16"; src: url(fonts/ter-16n.woff2) format("woff2"); }
-@font-face { font-family: "T16B"; src: url(fonts/ter-16b.woff2) format("woff2"); }
-@font-face { font-family: "T20"; src: url(fonts/ter-20n.woff2) format("woff2"); }
-@font-face { font-family: "T20B"; src: url(fonts/ter-20b.woff2) format("woff2"); }
-@font-face { font-family: "T24"; src: url(fonts/ter-24n.woff2) format("woff2"); }
-@font-face { font-family: "T24B"; src: url(fonts/ter-24b.woff2) format("woff2"); }
-@font-face { font-family: "T28"; src: url(fonts/ter-28n.woff2) format("woff2"); }
-@font-face { font-family: "T28B"; src: url(fonts/ter-28b.woff2) format("woff2"); }
-@font-face { font-family: "T32"; src: url(fonts/ter-32n.woff2) format("woff2"); }
-@font-face { font-family: "T32B"; src: url(fonts/ter-32b.woff2) format("woff2"); }
+@font-face { font-family: "T16"; src: url(fonts/ter-16n.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T16B"; src: url(fonts/ter-16b.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T20"; src: url(fonts/ter-20n.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T20B"; src: url(fonts/ter-20b.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T24"; src: url(fonts/ter-24n.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T24B"; src: url(fonts/ter-24b.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T28"; src: url(fonts/ter-28n.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T28B"; src: url(fonts/ter-28b.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T32"; src: url(fonts/ter-32n.woff2?v=202611121516) format("woff2"); }
+@font-face { font-family: "T32B"; src: url(fonts/ter-32b.woff2?v=202611121516) format("woff2"); }
 
 /* Терминал в текстовом режиме: весь экран — одна сетка знакомест.
    Размер знакоместа подбирается под экран: Terminus 16, 20, 24, 28 или 32 (8×16 … 16×32).
@@ -167,7 +171,7 @@ body::after { /* сканлайны, цветная маска и виньетк
 <div id="power" aria-hidden="true" hidden><i></i></div>
 <div id="cur" aria-hidden="true" hidden></div>
 
-<script src="implants.js"></script>
+<script>document.write('<script src="implants.js?t=' + Date.now() + '"><\/script>');</script>
 <script>
 const EMB = [
   "............X............",
